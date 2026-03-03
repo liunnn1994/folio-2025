@@ -56,6 +56,173 @@
 11. **KTX2 / ETC1S 纹理压缩** — 使用 `npm run compress` 管线处理新贴图
 12. **WebSocket / msgpack** — 如需修改多人或服务器同步逻辑
 
+## 项目结构分析
+
+### 顶层目录
+
+```
+folio-2025/
+├── sources/          # 应用源码（JS、HTML、Stylus CSS）
+├── static/           # 编译后的游戏资源（模型、贴图、音效等）
+├── resources/        # 原始设计文件（Blender、PSD、SBS 等）
+├── scripts/          # 构建辅助脚本
+├── vite.config.js    # Vite 构建配置
+├── package.json      # 项目依赖与 npm 脚本
+└── .env.example      # 环境变量模板
+```
+
+### sources/ — 源码目录
+
+```
+sources/
+├── index.html            # HTML 入口，挂载 canvas 及 UI 根节点
+├── index.js              # JS 入口，实例化 Game 并启动
+├── threejs-override.js   # 对 Three.js 默认行为的局部覆盖
+├── Game/                 # 游戏核心逻辑（见下方详解）
+├── data/                 # 静态数据定义
+└── style/                # Stylus CSS 样式文件
+```
+
+#### sources/Game/ — 游戏核心
+
+| 文件 / 目录 | 说明 |
+|---|---|
+| `Game.js` | 全局单例，持有所有子系统引用，负责启动与帧循环 |
+| `Ticker.js` | 带优先级的 tick 调度器，驱动 Game Loop |
+| `Time.js` | 封装帧时间、delta、elapsed 等时间数据 |
+| `Rendering.js` | WebGPU/WebGL 渲染器初始化与后处理管线 |
+| `Viewport.js` | 视口尺寸监听与响应式适配 |
+| `Events.js` | 全局自定义事件总线，解耦模块通信 |
+| `Player.js` | 玩家状态管理（当前区域、交互、重生等） |
+| `View.js` | 摄像机位置与朝向控制 |
+| `Physics/` | Rapier3D 物理世界、车辆物理、调试线框 |
+| `World/` | 所有 3D 场景对象与视觉效果（见下方详解） |
+| `Inputs/` | 键盘、鼠标、触控、手柄、滚轮输入统一封装 |
+| `Cycles/` | 昼夜循环（`DayCycles`）与四季循环（`YearCycles`） |
+| `Materials/` | 自定义 TSL 节点材质（网格默认材质、网格材质等） |
+| `Geometries/` | 自定义几何体（风线、传送门石板等） |
+| `Passes/` | 自定义后处理通道（廉价景深等） |
+| `BlackFriday/` | 黑色星期五特殊活动逻辑 |
+| `utilities/` | 通用工具函数（数学、时间、响应式集合/映射） |
+| `Audio.js` | Howler.js 音频管理，按区域与事件播放音效 |
+| `Weather.js` | 天气状态（晴/雨/雪/雷暴）管理 |
+| `Terrain.js` | 地形高度图采样与碰撞数据 |
+| `ResourcesLoader.js` | 资源加载队列与进度管理 |
+| `Server.js` | WebSocket 连接与 msgpack 二进制通信 |
+| `Menu.js` / `Modals.js` | 主菜单与弹窗 UI 逻辑 |
+| `Notifications.js` | 屏幕通知提示系统 |
+| `Achievements.js` | 成就解锁检测与展示 |
+| `Quality.js` | 画质档位（低/中/高/超）动态切换 |
+| `Debug.js` | Tweakpane 调试面板注册与管理 |
+| `Monitoring.js` | 性能监控（FPS、内存等） |
+
+#### sources/Game/World/ — 3D 世界对象
+
+| 文件 / 目录 | 说明 |
+|---|---|
+| `World.js` | 世界根节点，统一初始化所有场景对象 |
+| `VisualVehicle.js` | 玩家车辆的视觉表现（模型、动画、车轮变形等） |
+| `Areas/` | 各功能区域（登陆区、项目区、社交区、职业区等） |
+| `Foliage.js` / `Trees.js` / `Bushes.js` / `Flowers.js` / `Grass.js` | 植被系统（GPU 实例化渲染） |
+| `Leaves.js` / `Snow.js` / `RainLines.js` / `Lightnings.js` | 天气粒子效果 |
+| `Tornado.js` / `VisualTornado.js` | 龙卷风物理与视觉效果 |
+| `WaterSurface.js` | 水面波纹与反射 |
+| `Terrain.js` / `Floor.js` / `Grid.js` | 地形网格与地面 |
+| `Tracks.js` / `Trails.js` | 车辙痕迹系统 |
+| `Wind.js` / `WindLines.js` | 风向模拟与风线视觉 |
+| `Scenery.js` | 场景装饰物统一管理 |
+| `Benches.js` / `Bricks.js` / `Fences.js` / `Lanterns.js` | 可交互/物理道具 |
+| `ExplosiveCrates.js` | 可爆炸箱子物理对象 |
+| `Whispers.js` | 隐藏彩蛋提示文字 |
+| `Intro.js` | 开场动画与过渡效果 |
+| `Bubble.js` / `Confetti.js` / `Fireballs.js` | 特殊粒子效果 |
+
+#### sources/Game/World/Areas/ — 互动区域
+
+| 文件 | 说明 |
+|---|---|
+| `LandingArea.js` | 登陆/起始区域 |
+| `ProjectsArea.js` | 项目展示区域 |
+| `SocialArea.js` | 社交媒体链接区域 |
+| `CareerArea.js` | 职业经历区域 |
+| `LabArea.js` | 实验室/实验项目区域 |
+| `AchievementsArea.js` | 成就展示区域 |
+| `CircuitArea.js` | 赛道竞速区域 |
+| `BowlingArea.js` | 保龄球小游戏区域 |
+| `AltarArea.js` | 祭坛/特殊互动区域 |
+| `BehindTheSceneArea.js` | 幕后/开发者区域 |
+| `TimeMachine.js` | 时间机器特殊区域 |
+| `ToiletArea.js` | 彩蛋区域 |
+| `CookieArea.js` | Cookie 彩蛋区域 |
+
+#### sources/data/ — 数据定义
+
+| 文件 | 说明 |
+|---|---|
+| `projects.js` | 展示的项目列表（名称、链接、描述等） |
+| `social.js` | 社交媒体账号列表 |
+| `achievements.js` | 成就定义（触发条件、图标、文案） |
+| `lab.js` | 实验项目列表 |
+| `countries.js` | 国家数据（用于访客地图等） |
+| `consoleLog.js` | 控制台欢迎信息内容 |
+
+#### sources/style/ — 样式文件
+
+所有样式均使用 **Stylus** 编写（`.styl`），按功能模块拆分，通过 `index.styl` 统一导入：
+
+| 文件 | 说明 |
+|---|---|
+| `general.styl` / `fonts.styl` | 全局基础样式与字体声明 |
+| `menu.styl` / `modals.styl` | 主菜单与弹窗样式 |
+| `controls.styl` / `options.styl` | 控制说明与设置面板样式 |
+| `achievements.styl` | 成就弹出提示样式 |
+| `notifications.styl` | 通知提示样式 |
+| `circuit.styl` / `circuit-end.styl` | 赛道计时 UI 样式 |
+| `map.styl` | 小地图样式 |
+| `tabs.styl` | 标签页样式 |
+| `tooltips.styl` / `interactiveButtons.styl` | 交互提示与按钮样式 |
+| `tweakpane.styl` | 调试面板自定义样式 |
+| `whispers.styl` | 彩蛋文字样式 |
+| `discord.styl` / `behindTheScene.styl` / `blackFriday.styl` | 特殊活动/页面样式 |
+
+### static/ — 游戏资源目录
+
+存放经过压缩处理的**运行时资源**，由 `npm run compress` 生成：
+
+| 子目录 | 内容 |
+|---|---|
+| `models/` | 压缩后的 `.glb` 3D 模型 |
+| `terrain/` | 地形高度图与贴图（KTX2 格式） |
+| `areas/` | 各区域专用资源 |
+| `sounds/` / `jukebox/` | 音效与背景音乐（`.ogg`/`.mp3`） |
+| `foliage/` / `particles/` | 植被与粒子贴图 |
+| `ui/` | UI 图片（WebP 格式） |
+| `fonts/` | 字体文件 |
+| `favicons/` | 网站图标 |
+| `social/` / `projects/` | 社交头像与项目截图 |
+| `overlay/` | 屏幕叠加层资源 |
+| `achievements/` | 成就图标 |
+
+### resources/ — 原始设计文件
+
+存放**不参与构建**的原始创作文件，仅供设计迭代使用：
+
+| 文件 / 目录 | 内容 |
+|---|---|
+| `folio-2025.blend` | 主 Blender 场景文件 |
+| `models/` | 各角色/物件的 `.blend` 源文件及导出的 `.glb` |
+| `textures/` | 原始贴图（`.psd`、`.png` 等） |
+| `sounds/` | 原始音频文件 |
+| `renders/` | 渲染输出图 |
+| `slabs.sbs` | Substance Designer 材质源文件 |
+| `palette.png` / `stars.psd` | 调色板与星空贴图源文件 |
+
+### scripts/ — 构建脚本
+
+| 文件 | 说明 |
+|---|---|
+| `compress.js` | 遍历 `static/` 目录，对 GLB 模型执行 ETC1S 纹理压缩，对 PNG/JPG 执行 KTX2 转换，对 UI 图片执行 WebP 转换 |
+
 ## Setup
 
 Create `.env` file based on `.env.example`
